@@ -27,7 +27,6 @@
 #include "../common.hpp"
 #include "../tag-host.hpp"
 #include "../interest.hpp"
-#include "../management/nfd-local-control-header.hpp"
 
 #include "nack-header.hpp"
 
@@ -36,7 +35,7 @@ namespace lp {
 
 /**
  * \brief represents a Network NACK
- * \details This type binds a NackHeader and an Interest, and is intended for use in network layer.
+ * \detail This type binds a NackHeader and an Interest, and is intended for use in network layer.
  */
 class Nack : public TagHost
 {
@@ -86,18 +85,6 @@ public: // getter/setter
   {
     m_header = header;
     return *this;
-  }
-
-  nfd::LocalControlHeader&
-  getLocalControlHeader()
-  {
-    return m_interest.getLocalControlHeader();
-  }
-
-  const nfd::LocalControlHeader&
-  getLocalControlHeader() const
-  {
-    return m_interest.getLocalControlHeader();
   }
 
 public: // NackHeader proxy

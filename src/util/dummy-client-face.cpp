@@ -33,12 +33,10 @@ class DummyClientFace::Transport : public ndn::Transport
 {
 public:
   void
-  receive(Block block)
+  receive(const Block& block)
   {
-    block.encode();
-    if (static_cast<bool>(m_receiveCallback)) {
+    if (static_cast<bool>(m_receiveCallback))
       m_receiveCallback(block);
-    }
   }
 
   virtual void
@@ -101,47 +99,21 @@ void
 DummyClientFace::construct(const Options& options)
 {
   m_transport->onSendBlock.connect([this] (const Block& blockFromDaemon) {
-    try {
-      Block packet(blockFromDaemon);
-      packet.encode();
-      lp::Packet lpPacket(packet);
+    const Block& block = nfd::LocalControlHeader::getPayload(blockFromDaemon);
 
-      Buffer::const_iterator begin, end;
-      std::tie(begin, end) = lpPacket.get<lp::FragmentField>();
-      Block block(&*begin, std::distance(begin, end));
+    if (block.type() == tlv::Interest) {
+      shared_ptr<Interest> interest = make_shared<Interest>(block);
+      if (&block != &blockFromDaemon)
+        interest->getLocalControlHeader().wireDecode(blockFromDaemon);
 
-      if (block.type() == tlv::Interest) {
-        shared_ptr<Interest> interest = make_shared<Interest>(block);
-        if (lpPacket.has<lp::NackField>()) {
-          shared_ptr<lp::Nack> nack = make_shared<lp::Nack>(std::move(*interest));
-          nack->setHeader(lpPacket.get<lp::NackField>());
-          if (lpPacket.has<lp::NextHopFaceIdField>()) {
-            nack->getLocalControlHeader().setNextHopFaceId(lpPacket.get<lp::NextHopFaceIdField>());
-          }
-          onSendNack(*nack);
-        }
-        else {
-          if (lpPacket.has<lp::NextHopFaceIdField>()) {
-            interest->getLocalControlHeader().
-              setNextHopFaceId(lpPacket.get<lp::NextHopFaceIdField>());
-          }
-          onSendInterest(*interest);
-        }
-      }
-      else if (block.type() == tlv::Data) {
-        shared_ptr<Data> data = make_shared<Data>(block);
-
-        if (lpPacket.has<lp::CachePolicyField>()) {
-          if (lpPacket.get<lp::CachePolicyField>().getPolicy() == lp::CachePolicyType::NO_CACHE) {
-            data->getLocalControlHeader().setCachingPolicy(nfd::LocalControlHeader::CachingPolicy::NO_CACHE);
-          }
-        }
-
-        onSendData(*data);
-      }
+      onSendInterest(*interest);
     }
-    catch (tlv::Error& e) {
-      throw tlv::Error("Error decoding NDNLPv2 packet");
+    else if (block.type() == tlv::Data) {
+      shared_ptr<Data> data = make_shared<Data>(block);
+      if (&block != &blockFromDaemon)
+        data->getLocalControlHeader().wireDecode(blockFromDaemon);
+
+      onSendData(*data);
     }
   });
 
@@ -160,9 +132,6 @@ DummyClientFace::enablePacketLogging()
   });
   onSendData.connect([this] (const Data& data) {
     this->sentDatas.push_back(data);
-  });
-  onSendNack.connect([this] (const lp::Nack& nack) {
-    this->sentNacks.push_back(nack);
   });
 }
 
@@ -199,19 +168,22 @@ template<typename Packet>
 void
 DummyClientFace::receive(const Packet& packet)
 {
-  lp::Packet lpPacket(packet.wireEncode());
+  // do not restrict what injected control header can contain
+  if (!packet.getLocalControlHeader().empty(nfd::LocalControlHeader::ENCODE_ALL)) {
 
-  nfd::LocalControlHeader localControlHeader = packet.getLocalControlHeader();
+    Block header = packet.getLocalControlHeader().wireEncode(packet,
+                                                             nfd::LocalControlHeader::ENCODE_ALL);
+    Block payload = packet.wireEncode();
 
-  if (localControlHeader.hasIncomingFaceId()) {
-    lpPacket.add<lp::IncomingFaceIdField>(localControlHeader.getIncomingFaceId());
+    EncodingBuffer encoder(header.size() + payload.size(), header.size() + payload.size());
+    encoder.appendByteArray(header.wire(), header.size());
+    encoder.appendByteArray(payload.wire(), payload.size());
+
+    m_transport->receive(encoder.block());
   }
-
-  if (localControlHeader.hasNextHopFaceId()) {
-    lpPacket.add<lp::NextHopFaceIdField>(localControlHeader.getNextHopFaceId());
+  else {
+    m_transport->receive(packet.wireEncode());
   }
-
-  m_transport->receive(lpPacket.wireEncode());
 }
 
 template void
@@ -220,23 +192,6 @@ DummyClientFace::receive<Interest>(const Interest& packet);
 template void
 DummyClientFace::receive<Data>(const Data& packet);
 
-template<>
-void
-DummyClientFace::receive<lp::Nack>(const lp::Nack& nack)
-{
-  lp::Packet lpPacket;
-  lpPacket.add<lp::NackField>(nack.getHeader());
-  Block interest = nack.getInterest().wireEncode();
-  lpPacket.add<lp::FragmentField>(make_pair(interest.begin(), interest.end()));
-
-  nfd::LocalControlHeader localControlHeader = nack.getLocalControlHeader();
-
-  if (localControlHeader.hasIncomingFaceId()) {
-    lpPacket.add<lp::IncomingFaceIdField>(localControlHeader.getIncomingFaceId());
-  }
-
-  m_transport->receive(lpPacket.wireEncode());
-}
 
 shared_ptr<DummyClientFace>
 makeDummyClientFace(const DummyClientFace::Options& options)

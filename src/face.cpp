@@ -20,6 +20,10 @@
  */
 
 #include "face.hpp"
+
+#include "ns3/log.h"
+NS_LOG_COMPONENT_DEFINE("ndn-cxx.Face");
+
 #include "detail/face-impl.hpp"
 
 #include "encoding/tlv.hpp"
@@ -29,193 +33,82 @@
 #include "util/random.hpp"
 #include "util/face-uri.hpp"
 
+#include "ns3/ndnSIM/helper/ndn-stack-helper.hpp"
+
 namespace ndn {
 
 Face::Face()
-  : m_internalIoService(new boost::asio::io_service())
-  , m_ioService(*m_internalIoService)
-  , m_internalKeyChain(new KeyChain())
-  , m_impl(new Impl(*this))
+  : m_impl(new Impl(*this))
 {
-  construct(*m_internalKeyChain);
+  construct();
 }
 
-Face::Face(boost::asio::io_service& ioService)
-  : m_ioService(ioService)
-  , m_internalKeyChain(new KeyChain())
-  , m_impl(new Impl(*this))
+Face::Face(boost::asio::io_service&)
+  : m_impl(new Impl(*this))
 {
-  construct(*m_internalKeyChain);
-}
-
-Face::Face(const std::string& host, const std::string& port/* = "6363"*/)
-  : m_internalIoService(new boost::asio::io_service())
-  , m_ioService(*m_internalIoService)
-  , m_internalKeyChain(new KeyChain())
-  , m_impl(new Impl(*this))
-{
-  construct(make_shared<TcpTransport>(host, port), *m_internalKeyChain);
-}
-
-Face::Face(const shared_ptr<Transport>& transport)
-  : m_internalIoService(new boost::asio::io_service())
-  , m_ioService(*m_internalIoService)
-  , m_internalKeyChain(new KeyChain())
-  , m_impl(new Impl(*this))
-{
-  construct(transport, *m_internalKeyChain);
-}
-
-Face::Face(const shared_ptr<Transport>& transport,
-           boost::asio::io_service& ioService)
-  : m_ioService(ioService)
-  , m_internalKeyChain(new KeyChain())
-  , m_impl(new Impl(*this))
-{
-  construct(transport, *m_internalKeyChain);
-}
-
-Face::Face(shared_ptr<Transport> transport,
-           boost::asio::io_service& ioService,
-           KeyChain& keyChain)
-  : m_ioService(ioService)
-  , m_internalKeyChain(nullptr)
-  , m_impl(new Impl(*this))
-{
-  construct(transport, keyChain);
+  construct();
 }
 
 void
-Face::construct(KeyChain& keyChain)
+Face::construct()
 {
-  // transport=unix:///var/run/nfd.sock
-  // transport=tcp://localhost:6363
+  static ::ndn::KeyChain keyChain("pib-dummy", "tpm-dummy");
 
-  ConfigFile config;
-  const auto& transportType = config.getParsedConfiguration()
-                                .get_optional<std::string>("transport");
-  if (!transportType) {
-    // transport not specified, use default Unix transport.
-    construct(UnixTransport::create(config), keyChain);
-    return;
-  }
-
-  unique_ptr<util::FaceUri> uri;
-  try {
-    uri.reset(new util::FaceUri(*transportType));
-  }
-  catch (const util::FaceUri::Error& error) {
-    BOOST_THROW_EXCEPTION(ConfigFile::Error(error.what()));
-  }
-
-  const std::string protocol = uri->getScheme();
-
-  if (protocol == "unix") {
-    construct(UnixTransport::create(config), keyChain);
-  }
-  else if (protocol == "tcp" || protocol == "tcp4" || protocol == "tcp6") {
-    construct(TcpTransport::create(config), keyChain);
-  }
-  else {
-    BOOST_THROW_EXCEPTION(ConfigFile::Error("Unsupported transport protocol \"" + protocol + "\""));
-  }
-}
-
-void
-Face::construct(shared_ptr<Transport> transport, KeyChain& keyChain)
-{
-  m_nfdController.reset(new nfd::Controller(*this, keyChain));
-
-  m_transport = transport;
-
-  m_ioService.post([=] { m_impl->ensureConnected(false); });
+  m_nfdController.reset(new nfd::Controller(*this, ns3::ndn::StackHelper::getKeyChain()));
 }
 
 Face::~Face() = default;
 
 const PendingInterestId*
-Face::expressInterest(const Interest& interest,
-                      const DataCallback& afterSatisfied,
-                      const NackCallback& afterNacked,
-                      const TimeoutCallback& afterTimeout)
+Face::expressInterest(const Interest& interest, const OnData& onData, const OnTimeout& onTimeout)
 {
+  NS_LOG_INFO (">> Interest: " << interest.getName());
+
   shared_ptr<Interest> interestToExpress = make_shared<Interest>(interest);
-
-  // Use `interestToExpress` to avoid wire format creation for the original Interest
-  if (interestToExpress->wireEncode().size() > MAX_NDN_PACKET_SIZE) {
-    BOOST_THROW_EXCEPTION(Error("Interest size exceeds maximum limit"));
-  }
-
-  // If the same ioService thread, dispatch directly calls the method
-  m_ioService.dispatch([=] { m_impl->asyncExpressInterest(interestToExpress, afterSatisfied,
-                                                          afterNacked, afterTimeout); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->asyncExpressInterest(interestToExpress, onData, onTimeout);
+    });
 
   return reinterpret_cast<const PendingInterestId*>(interestToExpress.get());
 }
 
 const PendingInterestId*
-Face::expressInterest(const Interest& interest,
-                      const OnData& onData,
-                      const OnTimeout& onTimeout)
-{
-  return this->expressInterest(
-    interest,
-    [onData] (const Interest& interest, const Data& data) {
-      if (onData != nullptr) {
-        onData(interest, const_cast<Data&>(data));
-      }
-    },
-    [onTimeout] (const Interest& interest, const lp::Nack& nack) {
-      if (onTimeout != nullptr) {
-        onTimeout(interest);
-      }
-    },
-    onTimeout
-  );
-}
-
-const PendingInterestId*
 Face::expressInterest(const Name& name,
                       const Interest& tmpl,
-                      const OnData& onData, const OnTimeout& onTimeout/* = nullptr*/)
+                      const OnData& onData, const OnTimeout& onTimeout/* = OnTimeout()*/)
 {
   return expressInterest(Interest(tmpl)
-                         .setName(name)
-                         .setNonce(0),
+                           .setName(name)
+                           .setNonce(0),
                          onData, onTimeout);
 }
 
 void
 Face::put(const Data& data)
 {
-  // Use original `data`, since wire format should already exist for the original Data
-  if (data.wireEncode().size() > MAX_NDN_PACKET_SIZE)
-    BOOST_THROW_EXCEPTION(Error("Data size exceeds maximum limit"));
+  NS_LOG_INFO (">> Data: " << data.getName());
 
   shared_ptr<const Data> dataPtr;
   try {
     dataPtr = data.shared_from_this();
   }
   catch (const bad_weak_ptr& e) {
-    std::cerr << "Face::put WARNING: the supplied Data should be created using make_shared<Data>()"
-              << std::endl;
+    NS_LOG_INFO("Face::put WARNING: the supplied Data should be created using make_shared<Data>()");
     dataPtr = make_shared<Data>(data);
   }
 
-  // If the same ioService thread, dispatch directly calls the method
-  m_ioService.dispatch([=] { m_impl->asyncPutData(dataPtr); });
-}
-
-void
-Face::put(const lp::Nack& nack)
-{
-  m_ioService.dispatch([=] { m_impl->asyncPutNack(make_shared<lp::Nack>(nack)); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->asyncPutData(dataPtr);
+    });
 }
 
 void
 Face::removePendingInterest(const PendingInterestId* pendingInterestId)
 {
-  m_ioService.post([=] { m_impl->asyncRemovePendingInterest(pendingInterestId); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0),
+                                    [=] {
+                                      m_impl->asyncRemovePendingInterest(pendingInterestId);
+                                    });
 }
 
 size_t
@@ -226,46 +119,49 @@ Face::getNPendingInterests() const
 
 const RegisteredPrefixId*
 Face::setInterestFilter(const InterestFilter& interestFilter,
-                  const OnInterest& onInterest,
-                  const RegisterPrefixFailureCallback& onFailure,
-                  const security::SigningInfo& signingInfo,
-                  uint64_t flags)
+                        const OnInterest& onInterest,
+                        const RegisterPrefixFailureCallback& onFailure,
+                        const security::SigningInfo& signingInfo,
+                        uint64_t flags)
 {
-    return setInterestFilter(interestFilter,
-                             onInterest,
-                             RegisterPrefixSuccessCallback(),
-                             onFailure,
-                             signingInfo,
-                             flags);
+  return setInterestFilter(interestFilter,
+                           onInterest,
+                           RegisterPrefixSuccessCallback(),
+                           onFailure,
+                           signingInfo,
+                           flags);
 }
 
 const RegisteredPrefixId*
 Face::setInterestFilter(const InterestFilter& interestFilter,
-                  const OnInterest& onInterest,
-                  const RegisterPrefixSuccessCallback& onSuccess,
-                  const RegisterPrefixFailureCallback& onFailure,
-                  const security::SigningInfo& signingInfo,
-                  uint64_t flags)
+                        const OnInterest& onInterest,
+                        const RegisterPrefixSuccessCallback& onSuccess,
+                        const RegisterPrefixFailureCallback& onFailure,
+                        const security::SigningInfo& signingInfo,
+                        uint64_t flags)
 {
-    shared_ptr<InterestFilterRecord> filter =
-      make_shared<InterestFilterRecord>(interestFilter, onInterest);
+  shared_ptr<InterestFilterRecord> filter =
+    make_shared<InterestFilterRecord>(interestFilter, onInterest);
 
-    nfd::CommandOptions options;
-    options.setSigningInfo(signingInfo);
+  nfd::CommandOptions options;
+  options.setSigningInfo(signingInfo);
 
-    return m_impl->registerPrefix(interestFilter.getPrefix(), filter,
-                                  onSuccess, onFailure,
-                                  flags, options);
+  return m_impl->registerPrefix(interestFilter.getPrefix(), filter,
+                                onSuccess, onFailure,
+                                flags, options);
 }
 
 const InterestFilterId*
 Face::setInterestFilter(const InterestFilter& interestFilter,
                         const OnInterest& onInterest)
 {
+  NS_LOG_INFO("Set Interest Filter << " << interestFilter);
+
   shared_ptr<InterestFilterRecord> filter =
     make_shared<InterestFilterRecord>(interestFilter, onInterest);
 
-  getIoService().post([=] { m_impl->asyncSetInterestFilter(filter); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0),
+                                    [=] { m_impl->asyncSetInterestFilter(filter); });
 
   return reinterpret_cast<const InterestFilterId*>(filter.get());
 }
@@ -336,21 +232,22 @@ Face::setInterestFilter(const InterestFilter& interestFilter,
 
 const RegisteredPrefixId*
 Face::registerPrefix(const Name& prefix,
-               const RegisterPrefixSuccessCallback& onSuccess,
-               const RegisterPrefixFailureCallback& onFailure,
-               const security::SigningInfo& signingInfo,
-               uint64_t flags)
+                     const RegisterPrefixSuccessCallback& onSuccess,
+                     const RegisterPrefixFailureCallback& onFailure,
+                     const security::SigningInfo& signingInfo,
+                     uint64_t flags)
 {
 
-    nfd::CommandOptions options;
-    options.setSigningInfo(signingInfo);
+  nfd::CommandOptions options;
+  options.setSigningInfo(signingInfo);
 
-    return m_impl->registerPrefix(prefix, shared_ptr<InterestFilterRecord>(),
-                                  onSuccess, onFailure,
-                                  flags, options);
+  return m_impl->registerPrefix(prefix, shared_ptr<InterestFilterRecord>(),
+                                onSuccess, onFailure,
+                                flags, options);
 }
 
 #ifdef NDN_FACE_KEEP_DEPRECATED_REGISTRATION_SIGNING
+
 const RegisteredPrefixId*
 Face::registerPrefix(const Name& prefix,
                      const RegisterPrefixSuccessCallback& onSuccess,
@@ -382,15 +279,18 @@ Face::registerPrefix(const Name& prefix,
 void
 Face::unsetInterestFilter(const RegisteredPrefixId* registeredPrefixId)
 {
-  m_ioService.post([=] { m_impl->asyncUnregisterPrefix(registeredPrefixId,
-                                                       UnregisterPrefixSuccessCallback(),
-                                                       UnregisterPrefixFailureCallback()); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->asyncUnregisterPrefix(registeredPrefixId,
+                                    UnregisterPrefixSuccessCallback(),
+                                    UnregisterPrefixFailureCallback()); });
 }
 
 void
 Face::unsetInterestFilter(const InterestFilterId* interestFilterId)
 {
-  m_ioService.post([=] { m_impl->asyncUnsetInterestFilter(interestFilterId); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->asyncUnsetInterestFilter(interestFilterId);
+    });
 }
 
 void
@@ -398,111 +298,26 @@ Face::unregisterPrefix(const RegisteredPrefixId* registeredPrefixId,
                        const UnregisterPrefixSuccessCallback& onSuccess,
                        const UnregisterPrefixFailureCallback& onFailure)
 {
-  m_ioService.post([=] { m_impl->asyncUnregisterPrefix(registeredPrefixId,onSuccess, onFailure); });
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->asyncUnregisterPrefix(registeredPrefixId,onSuccess, onFailure);
+    });
 }
 
 void
 Face::processEvents(const time::milliseconds& timeout/* = time::milliseconds::zero()*/,
                     bool keepThread/* = false*/)
 {
-  if (m_ioService.stopped()) {
-    m_ioService.reset(); // ensure that run()/poll() will do some work
-  }
-
-  try {
-    if (timeout < time::milliseconds::zero()) {
-        // do not block if timeout is negative, but process pending events
-        m_ioService.poll();
-        return;
-      }
-
-    if (timeout > time::milliseconds::zero()) {
-      boost::asio::io_service& ioService = m_ioService;
-      unique_ptr<boost::asio::io_service::work>& work = m_impl->m_ioServiceWork;
-      m_impl->m_processEventsTimeoutEvent =
-        m_impl->m_scheduler.scheduleEvent(timeout, [&ioService, &work] {
-            ioService.stop();
-            work.reset();
-          });
-    }
-
-    if (keepThread) {
-      // work will ensure that m_ioService is running until work object exists
-      m_impl->m_ioServiceWork.reset(new boost::asio::io_service::work(m_ioService));
-    }
-
-    m_ioService.run();
-  }
-  catch (...) {
-    m_impl->m_ioServiceWork.reset();
-    m_impl->m_pendingInterestTable.clear();
-    m_impl->m_registeredPrefixTable.clear();
-    throw;
-  }
 }
 
 void
 Face::shutdown()
 {
-  m_ioService.post([this] { this->asyncShutdown(); });
-}
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->m_pendingInterestTable.clear();
+      m_impl->m_registeredPrefixTable.clear();
 
-void
-Face::asyncShutdown()
-{
-  m_impl->m_pendingInterestTable.clear();
-  m_impl->m_registeredPrefixTable.clear();
-
-  if (m_transport->isConnected())
-    m_transport->close();
-
-  m_impl->m_ioServiceWork.reset();
-}
-
-/**
- * @brief extract local fields from NDNLPv2 packet and tag onto a network layer packet
- */
-template<typename NETPKT>
-static void
-extractLpLocalFields(NETPKT& netPacket, const lp::Packet& lpPacket)
-{
-  if (lpPacket.has<lp::IncomingFaceIdField>()) {
-    netPacket.getLocalControlHeader().
-      setIncomingFaceId(lpPacket.get<lp::IncomingFaceIdField>());
-  }
-}
-
-void
-Face::onReceiveElement(const Block& blockFromDaemon)
-{
-  lp::Packet lpPacket(blockFromDaemon); // bare Interest/Data is a valid lp::Packet,
-                                        // no need to distinguish
-
-  Buffer::const_iterator begin, end;
-  std::tie(begin, end) = lpPacket.get<lp::FragmentField>();
-  Block netPacket(&*begin, std::distance(begin, end));
-  switch (netPacket.type()) {
-    case tlv::Interest: {
-      shared_ptr<Interest> interest = make_shared<Interest>(netPacket);
-      if (lpPacket.has<lp::NackField>()) {
-        auto nack = make_shared<lp::Nack>(std::move(*interest));
-        nack->setHeader(lpPacket.get<lp::NackField>());
-        extractLpLocalFields(*nack, lpPacket);
-        m_impl->nackPendingInterests(*nack);
-      }
-      else {
-        extractLpLocalFields(*interest, lpPacket);
-        m_impl->processInterestFilters(*interest);
-      }
-      break;
-    }
-    case tlv::Data: {
-      shared_ptr<Data> data = make_shared<Data>(netPacket);
-      extractLpLocalFields(*data, lpPacket);
-      m_impl->satisfyPendingInterests(*data);
-      break;
-    }
-  }
+      m_impl->m_nfdFace->close();
+    });
 }
 
 } // namespace ndn

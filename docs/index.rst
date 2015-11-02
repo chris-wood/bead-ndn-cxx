@@ -19,14 +19,7 @@ ndn-cxx Documentation
    examples
    tutorials
    manpages
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
    code-style
-   RELEASE_NOTES
-   releases
 
 - :doc:`README`
 
@@ -44,15 +37,14 @@ ndn-cxx Documentation
 
 - :doc:`manpages`
 
-**Additional documentation**
+Documentation for ndn-cxx developers and contributors
++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 - `API documentation (doxygen) <doxygen/annotated.html>`_
 
 - :doc:`code-style`
 
-- :doc:`RELEASE_NOTES`
-
-- :doc:`releases`
+- :doc:`Release Notes <RELEASE_NOTES>`
 
 License
 -------

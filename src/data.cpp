@@ -47,6 +47,33 @@ Data::Data(const Block& wire)
   wireDecode(wire);
 }
 
+// CAW: deletion token added
+
+uint64_t
+Data::getToken() const
+{
+  if (m_token.value_size() == sizeof(uint64_t))
+    return *reinterpret_cast<const uint64_t*>(m_token.value());
+  else {
+    return readNonNegativeInteger(m_token);
+  }
+}
+
+Data&
+Data::setToken(uint64_t token)
+{
+  if (m_wire.hasWire() && m_token.value_size() == sizeof(uint64_t)) {
+    std::memcpy(const_cast<uint8_t*>(m_token.value()), &token, sizeof(token));
+  }
+  else {
+    m_token = makeBinaryBlock(tlv::Token,
+                              reinterpret_cast<const uint8_t*>(&token),
+                              sizeof(token));
+    m_wire.reset();
+  }
+  return *this;
+}
+
 template<encoding::Tag TAG>
 size_t
 Data::wireEncode(EncodingImpl<TAG>& encoder, bool unsignedPortion/* = false*/) const
@@ -80,6 +107,9 @@ Data::wireEncode(EncodingImpl<TAG>& encoder, bool unsignedPortion/* = false*/) c
 
   // MetaInfo
   totalLength += getMetaInfo().wireEncode(encoder);
+
+  // Deletion token
+  totalLength += encoder.prependBlock(m_token);
 
   // Name
   totalLength += getName().wireEncode(encoder);
@@ -146,6 +176,9 @@ Data::wireDecode(const Block& wire)
 
   // Name
   m_name.wireDecode(m_wire.get(tlv::Name));
+
+  // Deletion token
+  m_name.wireDecode(m_wire.get(tlv::Token));
 
   // MetaInfo
   m_metaInfo.wireDecode(m_wire.get(tlv::MetaInfo));

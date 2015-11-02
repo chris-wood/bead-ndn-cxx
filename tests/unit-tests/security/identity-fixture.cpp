@@ -113,9 +113,6 @@ private:
 };
 
 BOOST_GLOBAL_FIXTURE(IdentityFixture)
-#if BOOST_VERSION >= 105900
-;
-#endif // BOOST_VERSION >= 105900
 
 } // namespace security
 } // namespace ndn

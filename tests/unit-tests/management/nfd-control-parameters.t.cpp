@@ -33,12 +33,11 @@ BOOST_AUTO_TEST_CASE(FaceOptions)
 {
   ControlParameters parameters;
   parameters.setUri("tcp4://192.0.2.1:6363");
-  parameters.setFacePersistency(ndn::nfd::FacePersistency::FACE_PERSISTENCY_PERSISTENT);
+
   Block wire = parameters.wireEncode();
 
   ControlParameters decoded(wire);
   BOOST_CHECK_EQUAL(decoded.getUri(), "tcp4://192.0.2.1:6363");
-  BOOST_CHECK_EQUAL(decoded.getFacePersistency(), ndn::nfd::FacePersistency::FACE_PERSISTENCY_PERSISTENT);
 
   BOOST_CHECK_EQUAL(decoded.hasName(), false);
   BOOST_CHECK_EQUAL(decoded.hasFaceId(), false);
@@ -68,7 +67,6 @@ BOOST_AUTO_TEST_CASE(FaceLocalControlOptions)
   BOOST_CHECK_EQUAL(decoded.hasFlags(), false);
   BOOST_CHECK_EQUAL(decoded.hasStrategy(), false);
   BOOST_CHECK_EQUAL(decoded.hasExpirationPeriod(), false);
-  BOOST_CHECK_EQUAL(decoded.hasFacePersistency(), false);
 }
 
 BOOST_AUTO_TEST_CASE(FibOptions)
@@ -91,7 +89,6 @@ BOOST_AUTO_TEST_CASE(FibOptions)
   BOOST_CHECK_EQUAL(decoded.hasFlags(), false);
   BOOST_CHECK_EQUAL(decoded.hasStrategy(), false);
   BOOST_CHECK_EQUAL(decoded.hasExpirationPeriod(), false);
-  BOOST_CHECK_EQUAL(decoded.hasFacePersistency(), false);
 }
 
 BOOST_AUTO_TEST_CASE(StrategyChoiceOptions)
@@ -113,7 +110,6 @@ BOOST_AUTO_TEST_CASE(StrategyChoiceOptions)
   BOOST_CHECK_EQUAL(decoded.hasCost(), false);
   BOOST_CHECK_EQUAL(decoded.hasFlags(), false);
   BOOST_CHECK_EQUAL(decoded.hasExpirationPeriod(), false);
-  BOOST_CHECK_EQUAL(decoded.hasFacePersistency(), false);
 }
 
 BOOST_AUTO_TEST_CASE(RibOptions)
@@ -139,7 +135,6 @@ BOOST_AUTO_TEST_CASE(RibOptions)
   BOOST_CHECK_EQUAL(decoded.hasUri(), false);
   BOOST_CHECK_EQUAL(decoded.hasLocalControlFeature(), false);
   BOOST_CHECK_EQUAL(decoded.hasStrategy(), false);
-  BOOST_CHECK_EQUAL(decoded.hasFacePersistency(), false);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

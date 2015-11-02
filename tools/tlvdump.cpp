@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
- * Copyright (c) 2013-2015 Regents of the University of California.
+ * Copyright (c) 2013-2014 Regents of the University of California.
  *
  * This file is part of ndn-cxx library (NDN C++ library with eXperimental eXtensions).
  *
@@ -171,9 +171,6 @@ parseBlocksFromStream(std::istream& is)
 
 int main(int argc, const char *argv[])
 {
-  std::cerr << "tlvdump is deprecated. Use ndn-dissect program from ndn-tools repository.\n"
-               "See `man tlvdump` for details." << std::endl;
-
   if (argc == 1 ||
       (argc == 2 && std::string(argv[1]) == "-"))
     {
