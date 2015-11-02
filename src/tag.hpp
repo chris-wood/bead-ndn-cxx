@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
- * Copyright (c) 2013-2014 Regents of the University of California.
+ * Copyright (c) 2013-2015 Regents of the University of California.
  *
  * This file is part of ndn-cxx library (NDN C++ library with eXperimental eXtensions).
  *
@@ -38,11 +38,13 @@ public:
    * @return an integer that uniquely identifies this Tag type
    * @sa http://redmine.named-data.net/projects/ndn-cxx/wiki/PacketTagTypes
    */
-  // static constexpr int
-  // getTypeId()
-  // {
-  //   return <type-identifier>;
-  // }
+#ifdef DOXYGEN
+  static constexpr int
+  getTypeId()
+  {
+    return <type-identifier>;
+  }
+#endif // DOXYGEN
 };
 
 inline

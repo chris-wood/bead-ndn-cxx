@@ -55,11 +55,12 @@ public:
   /**
    * \brief encode packet into wire format
    */
-  const Block&
+  const Block
   wireEncode() const;
 
   /**
    * \brief decode packet from wire format
+   * \throws Error unknown TLV-TYPE
    */
   void
   wireDecode(const Block& wire);
@@ -67,7 +68,7 @@ public:
 public: // field access
   /**
    * \return true if FIELD occurs one or more times
-   * \detail This is equivalent to count()>0
+   * \details This is equivalent to count() > 0
    */
   template<typename FIELD>
   bool
@@ -136,7 +137,7 @@ public: // field access
 
   /**
    * \brief remove all occurrences of FIELD, and add a FIELD with value
-   * \detail This equivalent to clear() followed by add(value)
+   * \details This equivalent to clear() followed by add(value)
    */
   template<typename FIELD>
   Packet&

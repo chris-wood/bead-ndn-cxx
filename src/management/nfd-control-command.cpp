@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
- * Copyright (c) 2013-2014 Regents of the University of California.
+ * Copyright (c) 2013-2015 Regents of the University of California.
  *
  * This file is part of ndn-cxx library (NDN C++ library with eXperimental eXtensions).
  *
@@ -95,10 +95,20 @@ FaceCreateCommand::FaceCreateCommand()
   : ControlCommand("faces", "create")
 {
   m_requestValidator
-    .required(CONTROL_PARAMETER_URI);
+    .required(CONTROL_PARAMETER_URI)
+    .optional(CONTROL_PARAMETER_FACE_PERSISTENCY);
   m_responseValidator
     .required(CONTROL_PARAMETER_URI)
-    .required(CONTROL_PARAMETER_FACE_ID);
+    .required(CONTROL_PARAMETER_FACE_ID)
+    .required(CONTROL_PARAMETER_FACE_PERSISTENCY);
+}
+
+void
+FaceCreateCommand::applyDefaultsToRequest(ControlParameters& parameters) const
+{
+  if (!parameters.hasFacePersistency()) {
+    parameters.setFacePersistency(FacePersistency::FACE_PERSISTENCY_PERSISTENT);
+  }
 }
 
 void
