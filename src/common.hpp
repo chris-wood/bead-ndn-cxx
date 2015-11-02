@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
- * Copyright (c) 2013-2015 Regents of the University of California.
+ * Copyright (c) 2013-2014 Regents of the University of California.
  *
  * This file is part of ndn-cxx library (NDN C++ library with eXperimental eXtensions).
  *
@@ -73,7 +73,6 @@
 #include <string>
 #include <type_traits>
 #include <unistd.h>
-#include <utility>
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define DEPRECATED(func) func __attribute__ ((deprecated))
@@ -137,7 +136,5 @@ NDN_CXX_SPECIALIZE_BOOST_IS_PLACEHOLDER_FOR_STD_PLACEHOLDER(9)
 namespace ndn {
 using boost::noncopyable;
 }
-
-#include "util/backports.hpp"
 
 #endif // NDN_COMMON_HPP

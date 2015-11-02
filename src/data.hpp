@@ -211,6 +211,12 @@ public:
   Data&
   setFinalBlockId(const name::Component& finalBlockId);
 
+  uint64_t
+  getToken() const;
+
+  Data&
+  setToken(uint64_t token);
+
   //
   ///////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////
@@ -321,6 +327,7 @@ private:
   Name m_name;
   MetaInfo m_metaInfo;
   mutable Block m_content;
+  mutable Block m_token;
   Signature m_signature;
 
   mutable Block m_wire;

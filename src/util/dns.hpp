@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
- * Copyright (c) 2013-2015 Regents of the University of California.
+ * Copyright (c) 2013-2014 Regents of the University of California.
  *
  * This file is part of ndn-cxx library (NDN C++ library with eXperimental eXtensions).
  *
@@ -19,24 +19,22 @@
  * See AUTHORS.md for complete list of ndn-cxx authors and contributors.
  */
 
-#ifndef NDN_UTIL_DNS_HPP
-#define NDN_UTIL_DNS_HPP
+#ifndef NDN_UTIL_DNS_H
+#define NDN_UTIL_DNS_H
 
 #include "../util/time.hpp"
-
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/io_service.hpp>
 
 namespace ndn {
 namespace dns {
 
-typedef boost::asio::ip::address IpAddress;
-typedef function<bool (const IpAddress& address)> AddressSelector;
+typedef function<bool (const boost::asio::ip::address& address)> AddressSelector;
 
 struct AnyAddress
 {
   bool
-  operator()(const IpAddress& address) const
+  operator()(const boost::asio::ip::address& address)
   {
     return true;
   }
@@ -45,7 +43,7 @@ struct AnyAddress
 struct Ipv4Only
 {
   bool
-  operator()(const IpAddress& address) const
+  operator()(const boost::asio::ip::address& address)
   {
     return address.is_v4();
   }
@@ -54,7 +52,7 @@ struct Ipv4Only
 struct Ipv6Only
 {
   bool
-  operator()(const IpAddress& address) const
+  operator()(const boost::asio::ip::address& address)
   {
     return address.is_v6();
   }
@@ -62,12 +60,13 @@ struct Ipv6Only
 
 struct Error : public std::runtime_error
 {
-  explicit
   Error(const std::string& what)
     : std::runtime_error(what)
   {
   }
 };
+
+typedef boost::asio::ip::address IpAddress;
 
 typedef function<void (const IpAddress& address)> SuccessCallback;
 typedef function<void (const std::string& reason)> ErrorCallback;
@@ -79,22 +78,17 @@ typedef function<void (const std::string& reason)> ErrorCallback;
  *
  * Available address selector predicates:
  *
- * - dns::AnyAddress()
- * - dns::Ipv4Address()
- * - dns::Ipv6Address()
- *
- * \warning Even after the DNS resolution has timed out, it's possible that
- *          \p ioService keeps running and \p onSuccess is invoked at a later time.
- *          This could cause segmentation fault if \p onSuccess is deallocated.
- *          To stop the io_service, explicitly invoke \p ioService.stop().
+ * - resolver::AnyAddress()
+ * - resolver::Ipv4Address()
+ * - resolver::Ipv6Address()
  */
 void
 asyncResolve(const std::string& host,
              const SuccessCallback& onSuccess,
              const ErrorCallback& onError,
              boost::asio::io_service& ioService,
-             const AddressSelector& addressSelector = AnyAddress(),
-             time::nanoseconds timeout = time::seconds(4));
+             const ndn::dns::AddressSelector& addressSelector = ndn::dns::AnyAddress(),
+             const time::nanoseconds& timeout = time::seconds(4));
 
 /** \brief Synchronously resolve host
  *
@@ -103,16 +97,16 @@ asyncResolve(const std::string& host,
  *
  * Available address selector predicates:
  *
- * - dns::AnyAddress()
- * - dns::Ipv4Address()
- * - dns::Ipv6Address()
+ * - resolver::AnyAddress()
+ * - resolver::Ipv4Address()
+ * - resolver::Ipv6Address()
  */
 IpAddress
 syncResolve(const std::string& host,
             boost::asio::io_service& ioService,
-            const AddressSelector& addressSelector = AnyAddress());
+            const ndn::dns::AddressSelector& addressSelector = ndn::dns::AnyAddress());
 
 } // namespace dns
 } // namespace ndn
 
-#endif // NDN_UTIL_DNS_HPP
+#endif // NDN_UTIL_DNS_H

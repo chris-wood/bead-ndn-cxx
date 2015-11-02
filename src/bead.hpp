@@ -19,8 +19,8 @@
  * See AUTHORS.md for complete list of ndn-cxx authors and contributors.
  */
 
-#ifndef NDN_INTEREST_HPP
-#define NDN_INTEREST_HPP
+#ifndef NDN_BEAD_HPP
+#define NDN_BEAD_HPP
 
 #include "common.hpp"
 
@@ -35,14 +35,14 @@ namespace ndn {
 
 class Data;
 
-/** @var const unspecified_duration_type DEFAULT_INTEREST_LIFETIME;
- *  @brief default value for InterestLifetime
+/** @var const unspecified_duration_type DEFAULT_Bead_LIFETIME;
+ *  @brief default value for BeadLifetime
  */
-const time::milliseconds DEFAULT_INTEREST_LIFETIME = time::milliseconds(4000);
+const time::milliseconds DEFAULT_Bead_LIFETIME = time::milliseconds(4000);
 
-/** @brief represents an Interest packet
+/** @brief represents an Bead packet
  */
-class Interest : public TagHost, public enable_shared_from_this<Interest>
+class Bead : public TagHost, public enable_shared_from_this<Bead>
 {
 public:
   class Error : public tlv::Error
@@ -55,34 +55,34 @@ public:
     }
   };
 
-  /** @brief Create a new Interest with an empty name (`ndn:/`)
-   *  @warning In certain contexts that use Interest::shared_from_this(), Interest must be created
+  /** @brief Create a new Bead with an empty name (`ndn:/`)
+   *  @warning In certain contexts that use Bead::shared_from_this(), Bead must be created
    *           using `make_shared`. Otherwise, .shared_from_this() will throw an exception.
    */
-  Interest();
+  Bead();
 
-  /** @brief Create a new Interest with the given name
-   *  @param name The name for the interest.
+  /** @brief Create a new Bead with the given name
+   *  @param name The name for the Bead.
    *  @note This constructor allows implicit conversion from Name.
-   *  @warning In certain contexts that use Interest::shared_from_this(), Interest must be created
+   *  @warning In certain contexts that use Bead::shared_from_this(), Bead must be created
    *           using `make_shared`. Otherwise, .shared_from_this() will throw an exception.
    */
-  Interest(const Name& name);
+  Bead(const Name& name);
 
-  /** @brief Create a new Interest with the given name and interest lifetime
-   *  @param name             The name for the interest.
-   *  @param interestLifetime The interest lifetime in time::milliseconds, or -1 for none.
-   *  @warning In certain contexts that use Interest::shared_from_this(), Interest must be created
+  /** @brief Create a new Bead with the given name and Bead lifetime
+   *  @param name             The name for the Bead.
+   *  @param BeadLifetime The Bead lifetime in time::milliseconds, or -1 for none.
+   *  @warning In certain contexts that use Bead::shared_from_this(), Bead must be created
    *           using `make_shared`. Otherwise, .shared_from_this() will throw an exception.
    */
-  Interest(const Name& name, const time::milliseconds& interestLifetime);
+  Bead(const Name& name, const time::milliseconds& BeadLifetime);
 
   /** @brief Create from wire encoding
-   *  @warning In certain contexts that use Interest::shared_from_this(), Interest must be created
+   *  @warning In certain contexts that use Bead::shared_from_this(), Bead must be created
    *           using `make_shared`. Otherwise, .shared_from_this() will throw an exception.
    */
   explicit
-  Interest(const Block& wire);
+  Bead(const Block& wire);
 
   /**
    * @brief Fast encoding or block size estimation
@@ -115,7 +115,7 @@ public:
   /**
    * @brief Encode the name according to the NDN URI Scheme
    *
-   * If there are interest selectors, this method will append "?" and add the selectors as
+   * If there are Bead selectors, this method will append "?" and add the selectors as
    * a query string.  For example, "/test/name?ndn.ChildSelector=1"
    */
   std::string
@@ -124,36 +124,36 @@ public:
 public: // Link and forwarding hint
 
    /**
-   * @brief Check whether the Interest contains a Link object
+   * @brief Check whether the Bead contains a Link object
    * @return True if there is a link object, otherwise false
    */
   bool
   hasLink() const;
 
   /**
-   * @brief Get the link object for this interest
-   * @return The link object if there is one contained in this interest
-   * @throws Interest::Error if there is no link object contained in the interest
+   * @brief Get the link object for this Bead
+   * @return The link object if there is one contained in this Bead
+   * @throws Bead::Error if there is no link object contained in the Bead
    */
   Link
   getLink() const;
 
   /**
-   * @brief Set the link object for this interest
-   * @param link The link object that will be included in this interest (in wire format)
+   * @brief Set the link object for this Bead
+   * @param link The link object that will be included in this Bead (in wire format)
    * @post !hasSelectedDelegation()
    */
   void
   setLink(const Block& link);
 
   /**
-   *@brief Reset the wire format of the given interest and the contained link
+   *@brief Reset the wire format of the given Bead and the contained link
    */
   void
   unsetLink();
 
   /**
-   * @brief Check whether the Interest includes a selected delegation
+   * @brief Check whether the Bead includes a selected delegation
    * @return True if there is a selected delegation, otherwise false
    */
   bool
@@ -192,7 +192,7 @@ public: // Link and forwarding hint
   unsetSelectedDelegation();
 
 public: // matching
-  /** @brief Check if Interest, including selectors, matches the given @p name
+  /** @brief Check if Bead, including selectors, matches the given @p name
    *  @param name The name to be matched. If this is a Data name, it shall contain the
    *              implicit digest component
    */
@@ -200,7 +200,7 @@ public: // matching
   matchesName(const Name& name) const;
 
   /**
-   * @brief Check if Interest can be satisfied by @p data.
+   * @brief Check if Bead can be satisfied by @p data.
    *
    * This method considers Name, MinSuffixComponents, MaxSuffixComponents,
    * PublisherPublicKeyLocator, and Exclude.
@@ -218,7 +218,7 @@ public: // Name and guiders
     return m_name;
   }
 
-  Interest&
+  Bead&
   setName(const Name& name)
   {
     m_name = name;
@@ -226,16 +226,22 @@ public: // Name and guiders
     return *this;
   }
 
+  uint64_t
+  getToken() const;
+
+  Bead&
+  setToken(uint64_t token);
+
   const time::milliseconds&
-  getInterestLifetime() const
+  getBeadLifetime() const
   {
-    return m_interestLifetime;
+    return m_BeadLifetime;
   }
 
-  Interest&
-  setInterestLifetime(const time::milliseconds& interestLifetime)
+  Bead&
+  setBeadLifetime(const time::milliseconds& BeadLifetime)
   {
-    m_interestLifetime = interestLifetime;
+    m_BeadLifetime = BeadLifetime;
     m_wire.reset();
     return *this;
   }
@@ -248,19 +254,19 @@ public: // Name and guiders
     return m_nonce.hasWire();
   }
 
-  /** @brief Get Interest's nonce
+  /** @brief Get Bead's nonce
    *
    *  If nonce was not set before this call, it will be automatically assigned to a random value
    */
   uint32_t
   getNonce() const;
 
-  /** @brief Set Interest's nonce
+  /** @brief Set Bead's nonce
    *
    *  If wire format already exists, this call simply replaces nonce in the
    *  existing wire format, without resetting and recreating it.
    */
-  Interest&
+  Bead&
   setNonce(uint32_t nonce);
 
   /** @brief Refresh nonce
@@ -292,11 +298,11 @@ public: // local control header
     return getLocalControlHeader().getIncomingFaceId();
   }
 
-  Interest&
+  Bead&
   setIncomingFaceId(uint64_t incomingFaceId)
   {
     getLocalControlHeader().setIncomingFaceId(incomingFaceId);
-    // ! do not reset Interest's wire !
+    // ! do not reset Bead's wire !
     return *this;
   }
 
@@ -306,17 +312,17 @@ public: // local control header
     return getLocalControlHeader().getNextHopFaceId();
   }
 
-  Interest&
+  Bead&
   setNextHopFaceId(uint64_t nextHopFaceId)
   {
     getLocalControlHeader().setNextHopFaceId(nextHopFaceId);
-    // ! do not reset Interest's wire !
+    // ! do not reset Bead's wire !
     return *this;
   }
 
 public: // Selectors
   /**
-   * @return true if Interest has any selector present
+   * @return true if Bead has any selector present
    */
   bool
   hasSelectors() const
@@ -330,7 +336,7 @@ public: // Selectors
     return m_selectors;
   }
 
-  Interest&
+  Bead&
   setSelectors(const Selectors& selectors)
   {
     m_selectors = selectors;
@@ -344,7 +350,7 @@ public: // Selectors
     return m_selectors.getMinSuffixComponents();
   }
 
-  Interest&
+  Bead&
   setMinSuffixComponents(int minSuffixComponents)
   {
     m_selectors.setMinSuffixComponents(minSuffixComponents);
@@ -358,7 +364,7 @@ public: // Selectors
     return m_selectors.getMaxSuffixComponents();
   }
 
-  Interest&
+  Bead&
   setMaxSuffixComponents(int maxSuffixComponents)
   {
     m_selectors.setMaxSuffixComponents(maxSuffixComponents);
@@ -372,7 +378,7 @@ public: // Selectors
     return m_selectors.getPublisherPublicKeyLocator();
   }
 
-  Interest&
+  Bead&
   setPublisherPublicKeyLocator(const KeyLocator& keyLocator)
   {
     m_selectors.setPublisherPublicKeyLocator(keyLocator);
@@ -386,7 +392,7 @@ public: // Selectors
     return m_selectors.getExclude();
   }
 
-  Interest&
+  Bead&
   setExclude(const Exclude& exclude)
   {
     m_selectors.setExclude(exclude);
@@ -400,7 +406,7 @@ public: // Selectors
     return m_selectors.getChildSelector();
   }
 
-  Interest&
+  Bead&
   setChildSelector(int childSelector)
   {
     m_selectors.setChildSelector(childSelector);
@@ -414,7 +420,7 @@ public: // Selectors
     return m_selectors.getMustBeFresh();
   }
 
-  Interest&
+  Bead&
   setMustBeFresh(bool mustBeFresh)
   {
     m_selectors.setMustBeFresh(mustBeFresh);
@@ -424,13 +430,13 @@ public: // Selectors
 
 public: // EqualityComparable concept
   bool
-  operator==(const Interest& other) const
+  operator==(const Bead& other) const
   {
     return wireEncode() == other.wireEncode();
   }
 
   bool
-  operator!=(const Interest& other) const
+  operator!=(const Bead& other) const
   {
     return !(*this == other);
   }
@@ -439,7 +445,8 @@ private:
   Name m_name;
   Selectors m_selectors;
   mutable Block m_nonce;
-  time::milliseconds m_interestLifetime;
+  mutable Block m_token;
+  time::milliseconds m_BeadLifetime;
 
   mutable Block m_link;
   size_t m_selectedDelegationIndex;
@@ -450,10 +457,10 @@ private:
 };
 
 std::ostream&
-operator<<(std::ostream& os, const Interest& interest);
+operator<<(std::ostream& os, const Bead& Bead);
 
 inline std::string
-Interest::toUri() const
+Bead::toUri() const
 {
   std::ostringstream os;
   os << *this;
@@ -462,4 +469,4 @@ Interest::toUri() const
 
 } // namespace ndn
 
-#endif // NDN_INTEREST_HPP
+#endif // NDN_Bead_HPP

@@ -82,7 +82,7 @@ size_t
 prependStringBlock(EncodingImpl<TAG>& encoder, uint32_t type, const std::string& value);
 
 /**
- * @brief Create a TLV block type @p type with value from a string @p value
+ * @brief Create a TLV block type @p type with value from a string @p
  * @see prependStringBlock, readString
  */
 Block

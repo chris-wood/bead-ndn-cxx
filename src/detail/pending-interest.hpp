@@ -28,32 +28,31 @@
 #include "../util/time.hpp"
 #include "../util/scheduler.hpp"
 #include "../util/scheduler-scoped-event-id.hpp"
-#include "../lp/nack.hpp"
 
 namespace ndn {
 
 class PendingInterest : noncopyable
 {
 public:
+  typedef function<void(const Interest&, Data&)> OnData;
+  typedef function<void(const Interest&)> OnTimeout;
+
   /**
    * @brief Create a new PitEntry and set the timeout based on the current time and
-   *        the Interest lifetime.
-   * @param interest shared_ptr for the Interest
-   * @param dataCallback function to call when matching Data packet is received
-   * @param nackCallback function to call when Nack matching Interest is received
-   * @param timeoutCallback function to call if Interest times out
-   * @param scheduler Scheduler instance to use to schedule a timeout event. The scheduled
-   *                  event will be automatically cancelled when pending Interest is destroyed.
+   *        the interest lifetime.
+   *
+   * @param interest A shared_ptr for the interest
+   * @param onData A function object to call when a matching data packet is received.
+   * @param onTimeout A function object to call if the interest times out.
+   *                  If onTimeout is an empty OnTimeout(), this does not use it.
+   * @param scheduler Scheduler instance to use to schedule a timeout event.  The scheduled
+   *                  event will be automatically cancelled when pending interest is destroyed.
    */
-  PendingInterest(shared_ptr<const Interest> interest,
-                  const DataCallback& dataCallback,
-                  const NackCallback& nackCallback,
-                  const TimeoutCallback& timeoutCallback,
-                  Scheduler& scheduler)
+  PendingInterest(shared_ptr<const Interest> interest, const OnData& onData,
+                  const OnTimeout& onTimeout, Scheduler& scheduler)
     : m_interest(interest)
-    , m_dataCallback(dataCallback)
-    , m_nackCallback(nackCallback)
-    , m_timeoutCallback(timeoutCallback)
+    , m_onData(onData)
+    , m_onTimeout(onTimeout)
     , m_timeoutEvent(scheduler)
   {
     m_timeoutEvent =
@@ -66,10 +65,10 @@ public:
   /**
    * @return the Interest
    */
-  shared_ptr<const Interest>
+  const Interest&
   getInterest() const
   {
-    return m_interest;
+    return *m_interest;
   }
 
   /**
@@ -79,17 +78,7 @@ public:
   void
   invokeDataCallback(const Data& data)
   {
-    m_dataCallback(*m_interest, data);
-  }
-
-  /**
-   * @brief invokes the NackCallback
-   * @note If the NackCallback is an empty function, this method does nothing.
-   */
-  void
-  invokeNackCallback(const lp::Nack& nack)
-  {
-    m_nackCallback(*m_interest, nack);
+    m_onData(*m_interest, const_cast<Data&>(data));
   }
 
   /**
@@ -109,8 +98,8 @@ private:
   void
   invokeTimeoutCallback()
   {
-    if (m_timeoutCallback) {
-      m_timeoutCallback(*m_interest);
+    if (m_onTimeout) {
+      m_onTimeout(*m_interest);
     }
 
     BOOST_ASSERT(m_deleter);
@@ -119,9 +108,8 @@ private:
 
 private:
   shared_ptr<const Interest> m_interest;
-  DataCallback m_dataCallback;
-  NackCallback m_nackCallback;
-  TimeoutCallback m_timeoutCallback;
+  const OnData m_onData;
+  const OnTimeout m_onTimeout;
   util::scheduler::ScopedEventId m_timeoutEvent;
   std::function<void()> m_deleter;
 };
@@ -145,7 +133,7 @@ public:
   operator()(const shared_ptr<const PendingInterest>& pendingInterest) const
   {
     return (reinterpret_cast<const PendingInterestId*>(
-              pendingInterest->getInterest().get()) == m_id);
+              &pendingInterest->getInterest()) == m_id);
   }
 private:
   const PendingInterestId* m_id;

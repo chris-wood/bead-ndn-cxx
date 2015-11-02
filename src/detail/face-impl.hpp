@@ -39,9 +39,13 @@
 
 #include "../management/nfd-controller.hpp"
 #include "../management/nfd-command-options.hpp"
-#include "../management/nfd-local-control-header.hpp"
 
-#include "../lp/packet.hpp"
+#include <ns3/ptr.h>
+#include <ns3/node.h>
+#include <ns3/node-list.h>
+#include <ns3/ndnSIM/model/ndn-l3-protocol.hpp>
+
+#include "ns3/ndnSIM/NFD/daemon/face/local-face.hpp"
 
 namespace ndn {
 
@@ -52,32 +56,83 @@ public:
   typedef std::list<shared_ptr<InterestFilterRecord> > InterestFilterTable;
   typedef ContainerWithOnEmptySignal<shared_ptr<RegisteredPrefix>> RegisteredPrefixTable;
 
+  class NfdFace : public ::nfd::LocalFace
+  {
+  public:
+    NfdFace(Impl& face, const ::nfd::FaceUri& localUri, const ::nfd::FaceUri& remoteUri)
+      : ::nfd::LocalFace(localUri, remoteUri)
+      , m_appFaceImpl(face)
+    {
+    }
+
+  public: // from ::nfd::LocalFace
+    /**
+     * @brief Send Interest towards application
+     */
+    virtual void
+    sendInterest(const Interest& interest)
+    {
+      NS_LOG_DEBUG("<< Interest " << interest);
+      shared_ptr<const Interest> interestPtr = interest.shared_from_this();
+      m_appFaceImpl.m_scheduler.scheduleEvent(time::seconds(0), [this, interestPtr] {
+          m_appFaceImpl.processInterestFilters(*interestPtr);
+        });
+    }
+
+    /**
+     * @brief Send Data towards application
+     */
+    virtual void
+    sendData(const Data& data)
+    {
+      NS_LOG_DEBUG("<< Data " << data.getName());
+      shared_ptr<const Data> dataPtr = data.shared_from_this();
+      m_appFaceImpl.m_scheduler.scheduleEvent(time::seconds(0), [this, dataPtr] {
+          m_appFaceImpl.satisfyPendingInterests(*dataPtr);
+        });
+    }
+
+    /** \brief Close the face
+     *
+     *  This terminates all communication on the face and cause
+     *  onFail() method event to be invoked
+     */
+    virtual void
+    close()
+    {
+      this->fail("close");
+    }
+
+  private:
+    friend class Impl;
+    Impl& m_appFaceImpl;
+  };
+
+  ////////////////////////////////////////////////////////////////////////
+
   explicit
   Impl(Face& face)
     : m_face(face)
     , m_scheduler(m_face.getIoService())
-    , m_processEventsTimeoutEvent(m_scheduler)
   {
-    auto postOnEmptyPitOrNoRegisteredPrefixes = [this] {
-      this->m_face.getIoService().post(bind(&Impl::onEmptyPitOrNoRegisteredPrefixes, this));
-      // without this extra "post", transport can get paused (-async_read) and then resumed
-      // (+async_read) from within onInterest/onData callback.  After onInterest/onData
-      // finishes, there is another +async_read with the same memory block.  A few of such
-      // async_read duplications can cause various effects and result in segfault.
-    };
+    ns3::Ptr<ns3::Node> node = ns3::NodeList::GetNode(ns3::Simulator::GetContext());
+    NS_ASSERT_MSG(node->GetObject<ns3::ndn::L3Protocol>() != 0,
+                  "NDN stack should be installed on the node " << node);
 
-    m_pendingInterestTable.onEmpty.connect(postOnEmptyPitOrNoRegisteredPrefixes);
-    m_registeredPrefixTable.onEmpty.connect(postOnEmptyPitOrNoRegisteredPrefixes);
+    auto uri = ::nfd::FaceUri("ndnFace://" + boost::lexical_cast<std::string>(node->GetId()));
+    m_nfdFace = make_shared<NfdFace>(*this, uri, uri);
+
+    node->GetObject<ns3::ndn::L3Protocol>()->addFace(m_nfdFace);
   }
 
   /////////////////////////////////////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////////////////////////////////////
 
   void
-  satisfyPendingInterests(Data& data)
+  satisfyPendingInterests(const Data& data)
   {
     for (auto entry = m_pendingInterestTable.begin(); entry != m_pendingInterestTable.end(); ) {
-      if ((*entry)->getInterest()->matchesData(data)) {
+      if ((*entry)->getInterest().matchesData(data)) {
         shared_ptr<PendingInterest> matchedEntry = *entry;
 
         entry = m_pendingInterestTable.erase(entry);
@@ -90,25 +145,7 @@ public:
   }
 
   void
-  nackPendingInterests(const lp::Nack& nack)
-  {
-    for (auto entry = m_pendingInterestTable.begin(); entry != m_pendingInterestTable.end(); ) {
-      const Interest& pendingInterest = *(*entry)->getInterest();
-      if (pendingInterest == nack.getInterest()) {
-        shared_ptr<PendingInterest> matchedEntry = *entry;
-
-        entry = m_pendingInterestTable.erase(entry);
-
-        matchedEntry->invokeNackCallback(nack);
-      }
-      else {
-        ++entry;
-      }
-    }
-  }
-
-  void
-  processInterestFilters(Interest& interest)
+  processInterestFilters(const Interest& interest)
   {
     for (const auto& filter : m_interestFilterTable) {
       if (filter->doesMatch(interest.getName())) {
@@ -121,43 +158,16 @@ public:
   /////////////////////////////////////////////////////////////////////////////////////////////////
 
   void
-  ensureConnected(bool wantResume)
+  asyncExpressInterest(const shared_ptr<const Interest>& interest,
+                       const OnData& onData, const OnTimeout& onTimeout)
   {
-    if (!m_face.m_transport->isConnected())
-      m_face.m_transport->connect(m_face.m_ioService,
-                                  bind(&Face::onReceiveElement, &m_face, _1));
-
-    if (wantResume && !m_face.m_transport->isExpectingData())
-      m_face.m_transport->resume();
-  }
-
-  void
-  asyncExpressInterest(shared_ptr<const Interest> interest,
-                       const DataCallback& afterSatisfied,
-                       const NackCallback& afterNacked,
-                       const TimeoutCallback& afterTimeout)
-  {
-    this->ensureConnected(true);
-
     auto entry =
       m_pendingInterestTable.insert(make_shared<PendingInterest>(interest,
-                                                                 afterSatisfied,
-                                                                 afterNacked,
-                                                                 afterTimeout,
+                                                                 onData, onTimeout,
                                                                  ref(m_scheduler))).first;
     (*entry)->setDeleter([this, entry] { m_pendingInterestTable.erase(entry); });
 
-    lp::Packet packet;
-
-    nfd::LocalControlHeader localControlHeader = interest->getLocalControlHeader();
-    if (localControlHeader.hasNextHopFaceId()) {
-      packet.add<lp::NextHopFaceIdField>(localControlHeader.getNextHopFaceId());
-    }
-
-    packet.add<lp::FragmentField>(std::make_pair(interest->wireEncode().begin(),
-                                                 interest->wireEncode().end()));
-
-    m_face.m_transport->send(packet.wireEncode());
+    m_nfdFace->emitSignal(onReceiveInterest, *interest);
   }
 
   void
@@ -169,42 +179,7 @@ public:
   void
   asyncPutData(const shared_ptr<const Data>& data)
   {
-    this->ensureConnected(true);
-
-    lp::Packet packet;
-
-    nfd::LocalControlHeader localControlHeader = data->getLocalControlHeader();
-    if (localControlHeader.hasCachingPolicy()) {
-      switch (localControlHeader.getCachingPolicy()) {
-        case nfd::LocalControlHeader::CachingPolicy::NO_CACHE: {
-          lp::CachePolicy cachePolicy;
-          cachePolicy.setPolicy(lp::CachePolicyType::NO_CACHE);
-          packet.add<lp::CachePolicyField>(cachePolicy);
-          break;
-        }
-        default:
-          break;
-      }
-    }
-
-    packet.add<lp::FragmentField>(std::make_pair(data->wireEncode().begin(),
-                                                 data->wireEncode().end()));
-
-    m_face.m_transport->send(packet.wireEncode());
-  }
-
-  void
-  asyncPutNack(shared_ptr<const lp::Nack> nack)
-  {
-    this->ensureConnected(true);
-
-    lp::Packet packet;
-    packet.add<lp::NackField>(nack->getHeader());
-
-    Block interest = nack->getInterest().wireEncode();
-    packet.add<lp::FragmentField>(std::make_pair(interest.begin(), interest.end()));
-
-    m_face.m_transport->send(packet.wireEncode());
+    m_nfdFace->emitSignal(onReceiveData, *data);
   }
 
   /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -318,27 +293,15 @@ public:
     }
   }
 
-  void
-  onEmptyPitOrNoRegisteredPrefixes()
-  {
-    if (m_pendingInterestTable.empty() && m_registeredPrefixTable.empty()) {
-      m_face.m_transport->pause();
-      if (!m_ioServiceWork) {
-        m_processEventsTimeoutEvent.cancel();
-      }
-    }
-  }
-
 private:
   Face& m_face;
   util::Scheduler m_scheduler;
-  util::scheduler::ScopedEventId m_processEventsTimeoutEvent;
 
   PendingInterestTable m_pendingInterestTable;
   InterestFilterTable m_interestFilterTable;
   RegisteredPrefixTable m_registeredPrefixTable;
 
-  unique_ptr<boost::asio::io_service::work> m_ioServiceWork; // if thread needs to be preserved
+  shared_ptr<NfdFace> m_nfdFace;
 
   friend class Face;
 };

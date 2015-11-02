@@ -43,6 +43,10 @@ struct DecodeHelper
   BOOST_CONCEPT_REQUIRES(((WireDecodable<T>)), (T))
   decode(const Block& wire)
   {
+    if (wire.type() != TlvType::value) {
+      BOOST_THROW_EXCEPTION(ndn::tlv::Error("Unexpected TLV type " + std::to_string(wire.type())));
+    }
+
     T type;
     type.wireDecode(wire);
     return type;
@@ -55,6 +59,10 @@ struct DecodeHelper<TlvType, uint64_t>
   static uint64_t
   decode(const Block& wire)
   {
+    if (wire.type() != TlvType::value) {
+      BOOST_THROW_EXCEPTION(ndn::tlv::Error("Unexpected TLV type " + std::to_string(wire.type())));
+    }
+
     return readNonNegativeInteger(wire);
   }
 };
@@ -65,8 +73,12 @@ struct DecodeHelper<TlvType, std::pair<Buffer::const_iterator, Buffer::const_ite
   static std::pair<Buffer::const_iterator, Buffer::const_iterator>
   decode(const Block& wire)
   {
+    if (wire.type() != TlvType::value) {
+      BOOST_THROW_EXCEPTION(ndn::tlv::Error("Unexpected TLV type " + std::to_string(wire.type())));
+    }
+
     if (wire.value_size() == 0) {
-      BOOST_THROW_EXCEPTION(ndn::tlv::Error(to_string(wire.type()) + " must not be empty"));
+      BOOST_THROW_EXCEPTION(ndn::tlv::Error(std::to_string(wire.type()) + " must not be empty"));
     }
 
     return std::make_pair(wire.value_begin(), wire.value_end());
@@ -117,24 +129,12 @@ public:
   typedef std::integral_constant<uint64_t, TYPE> TlvType;
   typedef std::integral_constant<bool, REPEATABLE> IsRepeatable;
 
-  /** \brief decodes a field
-   *  \param wire a Block with top-level type \p TYPE
-   *  \return value of the field
-   */
   static ValueType
   decode(const Block& wire)
   {
-    if (wire.type() != TlvType::value) {
-      BOOST_THROW_EXCEPTION(ndn::tlv::Error("Unexpected TLV type " + to_string(wire.type())));
-    }
-
     return DecodeHelper<TlvType, ValueType>::decode(wire);
   }
 
-  /** \brief encodes a field and prepends to \p encoder its Block with top-level type \p TYPE
-   *  \param encoder Instance of the buffer encoder or buffer estimator
-   *  \param value value of the field
-   */
   template<typename encoding::Tag TAG, typename T>
   static size_t
   encode(EncodingImpl<TAG>& encoder, const T& value)

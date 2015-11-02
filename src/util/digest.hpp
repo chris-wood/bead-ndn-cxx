@@ -64,7 +64,7 @@ public:
   Digest();
 
   /**
-   * @brief Create digest of the input stream @p is
+   * @brief Create digest of the input stream @p
    * @param is input stream
    */
   explicit

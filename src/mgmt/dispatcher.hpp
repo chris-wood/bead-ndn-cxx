@@ -1,22 +1,26 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
- * Copyright (c) 2013-2015 Regents of the University of California.
+ * Copyright (c) 2014-2015,  Regents of the University of California,
+ *                           Arizona Board of Regents,
+ *                           Colorado State University,
+ *                           University Pierre & Marie Curie, Sorbonne University,
+ *                           Washington University in St. Louis,
+ *                           Beijing Institute of Technology,
+ *                           The University of Memphis.
  *
- * This file is part of ndn-cxx library (NDN C++ library with eXperimental eXtensions).
+ * This file is part of NFD (Named Data Networking Forwarding Daemon).
+ * See AUTHORS.md for complete list of NFD authors and contributors.
  *
- * ndn-cxx library is free software: you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option) any later version.
+ * NFD is free software: you can redistribute it and/or modify it under the terms
+ * of the GNU General Public License as published by the Free Software Foundation,
+ * either version 3 of the License, or (at your option) any later version.
  *
- * ndn-cxx library is distributed in the hope that it will be useful, but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+ * NFD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ * PURPOSE.  See the GNU General Public License for more details.
  *
- * You should have received copies of the GNU General Public License and GNU Lesser
- * General Public License along with ndn-cxx, e.g., in COPYING.md file.  If not, see
- * <http://www.gnu.org/licenses/>.
- *
- * See AUTHORS.md for complete list of ndn-cxx authors and contributors.
+ * You should have received a copy of the GNU General Public License along with
+ * NFD, e.g., in COPYING.md file.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef NDN_MGMT_DISPATCHER_HPP
@@ -72,8 +76,8 @@ typedef std::function<void(RejectReply act)> RejectContinuation;
  */
 typedef std::function<void(const Name& prefix, const Interest& interest,
                            const ControlParameters* params,
-                           const AcceptContinuation& accept,
-                           const RejectContinuation& reject)> Authorization;
+                           AcceptContinuation accept,
+                           RejectContinuation reject)> Authorization;
 
 /** \return an Authorization that accepts all Interests, with empty string as requester
  */
@@ -102,7 +106,7 @@ typedef std::function<void(const ControlResponse& resp)> CommandContinuation;
  */
 typedef std::function<void(const Name& prefix, const Interest& interest,
                            const ControlParameters& params,
-                           const CommandContinuation& done)> ControlCommandHandler;
+                           CommandContinuation done)> ControlCommandHandler;
 
 
 /** \brief a function to handle a StatusDataset request
@@ -193,9 +197,6 @@ public: // ControlCommand
    *                   relPrefixes in ControlCommands, StatusDatasets, NotificationStreams must be
    *                   non-overlapping
    *                   (no relPrefix is a prefix of another relPrefix)
-   *  \param authorization Callback to authorize the incoming commands
-   *  \param validateParams Callback to validate parameters of the incoming commands
-   *  \param handler Callback to handle the commands
    *  \pre no top-level prefix has been added
    *  \throw std::out_of_range \p relPrefix overlaps with an existing relPrefix
    *  \throw std::domain_error one or more top-level prefix has been added
@@ -216,9 +217,9 @@ public: // ControlCommand
   template<typename CP>
   void
   addControlCommand(const PartialName& relPrefix,
-                    const Authorization& authorization,
-                    const ValidateParameters& validateParams,
-                    const ControlCommandHandler& handler);
+                    Authorization authorization,
+                    ValidateParameters validateParams,
+                    ControlCommandHandler handler);
 
 public: // StatusDataset
   /** \brief register a StatusDataset or a prefix under which StatusDatasets can be requested
@@ -227,7 +228,6 @@ public: // StatusDataset
    *                   non-overlapping
    *                   (no relPrefix is a prefix of another relPrefix)
    *  \param authorization should set identity to Name() if the dataset is public
-   *  \param handler Callback to process the incoming dataset requests
    *  \pre no top-level prefix has been added
    *  \throw std::out_of_range \p relPrefix overlaps with an existing relPrefix
    *  \throw std::domain_error one or more top-level prefix has been added
@@ -254,8 +254,8 @@ public: // StatusDataset
    */
   void
   addStatusDataset(const PartialName& relPrefix,
-                   const Authorization& authorization,
-                   const StatusDatasetHandler& handler);
+                   Authorization authorization,
+                   StatusDatasetHandler handler);
 
 public: // NotificationStream
   /** \brief register a NotificationStream
@@ -418,9 +418,9 @@ private:
 template<typename CP>
 void
 Dispatcher::addControlCommand(const PartialName& relPrefix,
-                              const Authorization& authorization,
-                              const ValidateParameters& validateParams,
-                              const ControlCommandHandler& handler)
+                              Authorization authorization,
+                              ValidateParameters validateParams,
+                              ControlCommandHandler handler)
 {
   if (!m_topLevelPrefixes.empty()) {
     throw std::domain_error("one or more top-level prefix has been added");

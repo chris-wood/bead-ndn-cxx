@@ -29,7 +29,6 @@
 #include "interest-filter.hpp"
 #include "data.hpp"
 #include "security/signing-info.hpp"
-#include "lp/nack.hpp"
 
 #define NDN_FACE_KEEP_DEPRECATED_REGISTRATION_SIGNING
 
@@ -61,29 +60,12 @@ class Controller;
 }
 
 /**
- * @brief Callback called when expressed Interest gets satisfied with a Data packet
- */
-typedef function<void(const Interest&, const Data&)> DataCallback;
-
-/**
- * @brief Callback called when Nack is sent in response to expressed Interest
- */
-typedef function<void(const Interest&, const lp::Nack&)> NackCallback;
-
-/**
- * @brief Callback called when expressed Interest times out
- */
-typedef function<void(const Interest&)> TimeoutCallback;
-
-/**
  * @brief Callback called when expressed Interest gets satisfied with Data packet
- * @deprecated use DataCallback
  */
 typedef function<void(const Interest&, Data&)> OnData;
 
 /**
  * @brief Callback called when expressed Interest times out
- * @deprecated use TimeoutCallback
  */
 typedef function<void(const Interest&)> OnTimeout;
 
@@ -166,83 +148,23 @@ public: // constructors
   explicit
   Face(boost::asio::io_service& ioService);
 
-  /**
-   * @brief Create a new Face using TcpTransport
-   *
-   * @param host The host of the NDN forwarder
-   * @param port (optional) The port or service name of the NDN forwarder (**default**: "6363")
-   *
-   * @throws Face::Error on unsupported protocol
-   */
-  Face(const std::string& host, const std::string& port = "6363");
-
-  /**
-   * @brief Create a new Face using the given Transport
-   *
-   * @param transport A shared_ptr to a Transport object used for communication
-   *
-   * @throws Face::Error on unsupported protocol
-   */
-  explicit
-  Face(const shared_ptr<Transport>& transport);
-
-  /**
-   * @brief Create a new Face using the given Transport and IO service object
-   *
-   * @sa Face(boost::asio::io_service&)
-   *
-   * @throws Face::Error on unsupported protocol
-   */
-  Face(const shared_ptr<Transport>& transport,
-       boost::asio::io_service& ioService);
-
-  /**
-   * @brief Create a new Face using the given Transport and IO service object
-   * @param transport the Transport used for communication
-   * @param ioService the io_service that controls all IO operations
-   * @param keyChain the KeyChain to sign commands
-   * @throws Face::Error on unsupported protocol
-   * @note shared_ptr is passed by value because ownership is shared with this class
-   */
-  Face(shared_ptr<Transport> transport,
-       boost::asio::io_service& ioService,
-       KeyChain& keyChain);
-
   ~Face();
 
 public: // consumer
   /**
    * @brief Express Interest
-   * @param interest the Interest; a copy will be made, so that the caller is not
-   *                 required to maintain the argument unchanged
-   * @param afterSatisfied function to be invoked if Data is returned
-   * @param afterNacked function to be invoked if Network NACK is returned
-   * @param afterTimeout function to be invoked if neither Data nor Network NACK
-   *                     is returned within InterestLifetime
-   */
-  const PendingInterestId*
-  expressInterest(const Interest& interest,
-                  const DataCallback& afterSatisfied,
-                  const NackCallback& afterNacked,
-                  const TimeoutCallback& afterTimeout);
-
-  /**
-   * @brief Express Interest
    *
    * @param interest  An Interest to be expressed
    * @param onData    Callback to be called when a matching data packet is received
-   * @param onTimeout (optional) A function object to call if the interest times out or is Nacked
+   * @param onTimeout (optional) A function object to call if the interest times out
    *
    * @return The pending interest ID which can be used with removePendingInterest
    *
    * @throws Error when Interest size exceeds maximum limit (MAX_NDN_PACKET_SIZE)
-   *
-   * @deprecated use expressInterest(Interest, DataCallback, NackCallback, TimeoutCallback)
    */
   const PendingInterestId*
   expressInterest(const Interest& interest,
-                  const OnData& onData,
-                  const OnTimeout& onTimeout = nullptr);
+                  const OnData& onData, const OnTimeout& onTimeout = OnTimeout());
 
   /**
    * @brief Express Interest using name and Interest template
@@ -250,19 +172,16 @@ public: // consumer
    * @param name      Name of the Interest
    * @param tmpl      Interest template to fill parameters
    * @param onData    Callback to be called when a matching data packet is received
-   * @param onTimeout (optional) A function object to call if the interest times out or is Nacked
+   * @param onTimeout (optional) A function object to call if the interest times out
    *
    * @return Opaque pending interest ID which can be used with removePendingInterest
    *
    * @throws Error when Interest size exceeds maximum limit (MAX_NDN_PACKET_SIZE)
-   *
-   * @deprecated use expressInterest(Interest, DataCallback, NackCallback, TimeoutCallback)
    */
   const PendingInterestId*
   expressInterest(const Name& name,
                   const Interest& tmpl,
-                  const OnData& onData,
-                  const OnTimeout& onTimeout = nullptr);
+                  const OnData& onData, const OnTimeout& onTimeout = OnTimeout());
 
   /**
    * @brief Cancel previously expressed Interest
@@ -375,14 +294,13 @@ public: // producer
    * @return Opaque registered prefix ID which can be used with unsetInterestFilter or
    *         removeRegisteredPrefix
    */
-  DEPRECATED(
   const RegisteredPrefixId*
   setInterestFilter(const InterestFilter& interestFilter,
                     const OnInterest& onInterest,
                     const RegisterPrefixSuccessCallback& onSuccess,
                     const RegisterPrefixFailureCallback& onFailure,
                     const IdentityCertificate& certificate,
-                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT));
+                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT);
 
   /**
    * @deprecated Use override with SigningInfo instead of this function
@@ -406,13 +324,12 @@ public: // producer
    * @return Opaque registered prefix ID which can be used with unsetInterestFilter or
    *         removeRegisteredPrefix
    */
-  DEPRECATED(
   const RegisteredPrefixId*
   setInterestFilter(const InterestFilter& interestFilter,
                     const OnInterest& onInterest,
                     const RegisterPrefixFailureCallback& onFailure,
                     const IdentityCertificate& certificate,
-                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT));
+                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT);
 
   /**
    * @deprecated Use override with SigningInfo instead of this function
@@ -435,14 +352,13 @@ public: // producer
    *
    * @return Opaque registered prefix ID which can be used with removeRegisteredPrefix
    */
-  DEPRECATED(
   const RegisteredPrefixId*
   setInterestFilter(const InterestFilter& interestFilter,
                     const OnInterest& onInterest,
                     const RegisterPrefixSuccessCallback& onSuccess,
                     const RegisterPrefixFailureCallback& onFailure,
                     const Name& identity,
-                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT));
+                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT);
 
   /**
    * @deprecated Use override with SigningInfo instead of this function
@@ -464,13 +380,12 @@ public: // producer
    *
    * @return Opaque registered prefix ID which can be used with removeRegisteredPrefix
    */
-  DEPRECATED(
   const RegisteredPrefixId*
   setInterestFilter(const InterestFilter& interestFilter,
                     const OnInterest& onInterest,
                     const RegisterPrefixFailureCallback& onFailure,
                     const Name& identity,
-                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT));
+                    uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT);
 #endif // NDN_FACE_KEEP_DEPRECATED_REGISTRATION_SIGNING
 
   /**
@@ -485,10 +400,8 @@ public: // producer
    * @param onFailure   A callback to be called when prefixRegister command fails
    * @param signingInfo (optional) Signing parameters.  When omitted, a default parameters
    *                    used in the signature will be used.
-   * @param flags       Prefix registration flags
    *
    * @return The registered prefix ID which can be used with unregisterPrefix
-   * @see nfd::RouteFlags
    */
   const RegisteredPrefixId*
   registerPrefix(const Name& prefix,
@@ -516,13 +429,12 @@ public: // producer
    *
    * @return The registered prefix ID which can be used with unregisterPrefix
    */
-  DEPRECATED(
   const RegisteredPrefixId*
   registerPrefix(const Name& prefix,
                  const RegisterPrefixSuccessCallback& onSuccess,
                  const RegisterPrefixFailureCallback& onFailure,
                  const IdentityCertificate& certificate,
-                 uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT));
+                 uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT);
 
   /**
    * @deprecated Use override with SigningInfo instead of this function
@@ -542,13 +454,12 @@ public: // producer
    *
    * @return The registered prefix ID which can be used with unregisterPrefix
    */
-  DEPRECATED(
   const RegisteredPrefixId*
   registerPrefix(const Name& prefix,
                  const RegisterPrefixSuccessCallback& onSuccess,
                  const RegisterPrefixFailureCallback& onFailure,
                  const Name& identity,
-                 uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT));
+                 uint64_t flags = nfd::ROUTE_FLAG_CHILD_INHERIT);
 #endif // NDN_FACE_KEEP_DEPRECATED_REGISTRATION_SIGNING
 
   /**
@@ -611,35 +522,9 @@ public: // producer
   void
   put(const Data& data);
 
-  /**
-   * @brief sends a Network NACK
-   * @param nack the Nack; a copy will be made, so that the caller is not required to
-   *             maintain the argument unchanged
-   */
-  void
-  put(const lp::Nack& nack);
-
 public: // IO routine
   /**
-   * @brief Process any data to receive or call timeout callbacks.
-   *
-   * This call will block forever (default timeout == 0) to process IO on the face.
-   * To exit, one expected to call face.shutdown() from one of the callback methods.
-   *
-   * If positive timeout is specified, then processEvents will exit after this timeout, if
-   * not stopped earlier with face.shutdown() or when all active events finish.  The call
-   * can be called repeatedly, if desired.
-   *
-   * If negative timeout is specified, then processEvents will not block and process only
-   * pending events.
-   *
-   * @param timeout     maximum time to block the thread
-   * @param keepThread  Keep thread in a blocked state (in event processing), even when
-   *                    there are no outstanding events (e.g., no Interest/Data is expected)
-   *
-   * @throw This may throw an exception for reading data or in the callback for processing
-   * the data.  If you call this from an main event loop, you may want to catch and
-   * log/disregard all exceptions.
+   * @brief Noop (kept for compatibility)
    */
   void
   processEvents(const time::milliseconds& timeout = time::milliseconds::zero(),
@@ -657,43 +542,22 @@ public: // IO routine
   shutdown();
 
   /**
-   * @brief Get reference to IO service object
+   * @brief Return nullptr (kept for compatibility)
    */
   boost::asio::io_service&
   getIoService()
   {
-    return m_ioService;
+    return *static_cast<boost::asio::io_service*>(nullptr);
   }
 
 private:
-
-  /**
-   * @throws ConfigFile::Error on parse error and unsupported protocols
-   */
   void
-  construct(KeyChain& keyChain);
-
-  /**
-   * @throws Face::Error on unsupported protocol
-   * @note shared_ptr is passed by value because ownership is transferred to this function
-   */
-  void
-  construct(shared_ptr<Transport> transport, KeyChain& keyChain);
-
-  void
-  onReceiveElement(const Block& blockFromDaemon);
-
-  void
-  asyncShutdown();
+  construct();
 
 private:
-  /// the IO service owned by this Face, could be null
-  unique_ptr<boost::asio::io_service> m_internalIoService;
-  /// the IO service used by this Face
-  boost::asio::io_service& m_ioService;
+  class Impl;
 
-  shared_ptr<Transport> m_transport;
-
+private:
   /** @brief if not null, a pointer to an internal KeyChain owned by Face
    *  @note if a KeyChain is supplied to constructor, this pointer will be null,
    *        and the passed KeyChain is given to nfdController;
@@ -703,8 +567,6 @@ private:
   unique_ptr<KeyChain> m_internalKeyChain;
 
   unique_ptr<nfd::Controller> m_nfdController;
-
-  class Impl;
   unique_ptr<Impl> m_impl;
 };
 

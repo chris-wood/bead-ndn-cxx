@@ -157,8 +157,7 @@ public:
   find(const Name& name);
 
   /** @brief Deletes in-memory storage entry by prefix by default.
-   *  @param prefix Exact name of a prefix of the data to remove
-   *  @param isPrefix If false, the function will only delete the
+   *  @param[in] isPrefix If it is clear, the function will only delete the
    *  entry completely matched with the prefix according to canonical ordering.
    *  For this case, user should substitute the prefix with full name.
    *

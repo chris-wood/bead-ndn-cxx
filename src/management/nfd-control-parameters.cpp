@@ -50,10 +50,6 @@ ControlParameters::wireEncode(EncodingImpl<TAG>& encoder) const
 {
   size_t totalLength = 0;
 
-  if (this->hasFacePersistency()) {
-    totalLength += prependNonNegativeIntegerBlock(encoder,
-                   tlv::nfd::FacePersistency, m_facePersistency);
-  }
   if (this->hasExpirationPeriod()) {
     totalLength += prependNonNegativeIntegerBlock(encoder,
                    tlv::nfd::ExpirationPeriod, m_expirationPeriod.count());
@@ -183,12 +179,6 @@ ControlParameters::wireDecode(const Block& block)
   m_hasFields[CONTROL_PARAMETER_EXPIRATION_PERIOD] = val != m_wire.elements_end();
   if (this->hasExpirationPeriod()) {
     m_expirationPeriod = time::milliseconds(readNonNegativeInteger(*val));
-  }
-
-  val = m_wire.find(tlv::nfd::FacePersistency);
-  m_hasFields[CONTROL_PARAMETER_FACE_PERSISTENCY] = val != m_wire.elements_end();
-  if (this->hasFacePersistency()) {
-    m_facePersistency = static_cast<FacePersistency>(readNonNegativeInteger(*val));
   }
 }
 
