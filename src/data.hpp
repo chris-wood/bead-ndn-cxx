@@ -211,11 +211,11 @@ public:
   Data&
   setFinalBlockId(const name::Component& finalBlockId);
 
-  uint64_t
+  std::string
   getToken() const;
 
   Data&
-  setToken(uint64_t token);
+  setToken(std::string token);
 
   //
   ///////////////////////////////////////////////////////////////

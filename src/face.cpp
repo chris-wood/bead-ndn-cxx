@@ -84,7 +84,7 @@ Face::expressInterest(const Name& name,
 }
 
 void
-Face::put(const Data& data)
+Face::putData(const Data& data)
 {
   NS_LOG_INFO (">> Data: " << data.getName());
 
@@ -99,6 +99,25 @@ Face::put(const Data& data)
 
   m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
       m_impl->asyncPutData(dataPtr);
+    });
+}
+
+void
+Face::putBead(const Bead& bead)
+{
+  NS_LOG_INFO (">> Bead: " << bead.getName());
+
+  shared_ptr<const Bead> beadPtr;
+  try {
+    beadPtr = bead.shared_from_this();
+  }
+  catch (const bad_weak_ptr& e) {
+    NS_LOG_INFO("Face::put WARNING: the supplied Data should be created using make_shared<Data>()");
+    beadPtr = make_shared<Bead>(bead);
+  }
+
+  m_impl->m_scheduler.scheduleEvent(time::seconds(0), [=] {
+      m_impl->asyncPutBead(beadPtr);
     });
 }
 

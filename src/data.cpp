@@ -33,12 +33,14 @@ static_assert(std::is_base_of<tlv::Error, Data::Error>::value,
               "Data::Error must inherit from tlv::Error");
 
 Data::Data()
-  : m_content(tlv::Content) // empty content
+  : m_content(tlv::Content),
+    m_token(0) // empty content
 {
 }
 
 Data::Data(const Name& name)
-  : m_name(name)
+  : m_name(name),
+    m_token(0)
 {
 }
 
@@ -49,29 +51,37 @@ Data::Data(const Block& wire)
 
 // CAW: deletion token added
 
-uint64_t
+std::string
 Data::getToken() const
 {
-  if (m_token.value_size() == sizeof(uint64_t))
-    return *reinterpret_cast<const uint64_t*>(m_token.value());
-  else {
-    return readNonNegativeInteger(m_token);
+  if (m_token.value_size() == 0) {
+      const_cast<Data*>(this)->setToken("");
   }
+  return readString(m_token);
+  // if (m_token.value_size() > 0)
+  //   return *reinterpret_cast<std::string>(m_token.value());
+  // else {
+  //   return readString(m_token);
+  // }
 }
 
 Data&
-Data::setToken(uint64_t token)
+Data::setToken(std::string token)
 {
-  if (m_wire.hasWire() && m_token.value_size() == sizeof(uint64_t)) {
-    std::memcpy(const_cast<uint8_t*>(m_token.value()), &token, sizeof(token));
-  }
-  else {
-    m_token = makeBinaryBlock(tlv::Token,
-                              reinterpret_cast<const uint8_t*>(&token),
-                              sizeof(token));
-    m_wire.reset();
-  }
+  m_token = makeStringBlock(tlv::Token, token);
+  m_wire.reset();
   return *this;
+
+  // if (m_wire.hasWire() && m_token.value_size() > 0) {
+  //   std::memcpy(const_cast<uint8_t*>(m_token.value()), &(token.c_str()), strlen(token.c_str()));
+  // }
+  // else {
+  //   m_token = makeBinaryBlock(tlv::Token,
+  //                             reinterpret_cast<const uint8_t*>(&(token.c_str())),
+  //                             strlen(token.c_str()));
+  //   m_wire.reset();
+  // }
+  // return *this;
 }
 
 template<encoding::Tag TAG>
@@ -102,14 +112,15 @@ Data::wireEncode(EncodingImpl<TAG>& encoder, bool unsignedPortion/* = false*/) c
   // SignatureInfo
   totalLength += encoder.prependBlock(m_signature.getInfo());
 
+  // Deletion token
+  size_t newLength = encoder.prependBlock(m_token);
+  totalLength += newLength;
+
   // Content
   totalLength += encoder.prependBlock(getContent());
 
   // MetaInfo
   totalLength += getMetaInfo().wireEncode(encoder);
-
-  // Deletion token
-  totalLength += encoder.prependBlock(m_token);
 
   // Name
   totalLength += getName().wireEncode(encoder);
@@ -177,14 +188,16 @@ Data::wireDecode(const Block& wire)
   // Name
   m_name.wireDecode(m_wire.get(tlv::Name));
 
-  // Deletion token
-  m_name.wireDecode(m_wire.get(tlv::Token));
-
   // MetaInfo
   m_metaInfo.wireDecode(m_wire.get(tlv::MetaInfo));
 
   // Content
   m_content = m_wire.get(tlv::Content);
+
+  // Deletion token
+  if (m_wire.find(tlv::Token) != m_wire.elements_end()) {
+    m_token = m_wire.get(tlv::Token);
+  }
 
   ///////////////
   // Signature //

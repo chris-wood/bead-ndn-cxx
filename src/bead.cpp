@@ -89,29 +89,62 @@ Bead::setNonce(uint32_t nonce)
 
 // CAW: deletion token added
 
-uint64_t
+// uint64_t
+// Bead::getToken() const
+// {
+//   if (m_token.value_size() == sizeof(uint64_t))
+//     return *reinterpret_cast<const uint64_t*>(m_token.value());
+//   else {
+//     return readNonNegativeInteger(m_token);
+//   }
+// }
+//
+// Bead&
+// Bead::setToken(uint64_t token)
+// {
+//   if (m_wire.hasWire() && m_token.value_size() == sizeof(uint64_t)) {
+//     std::memcpy(const_cast<uint8_t*>(m_token.value()), &token, sizeof(token));
+//   }
+//   else {
+//     m_token = makeBinaryBlock(tlv::Token,
+//                               reinterpret_cast<const uint8_t*>(&token),
+//                               sizeof(token));
+//     m_wire.reset();
+//   }
+//   return *this;
+// }
+
+std::string
 Bead::getToken() const
 {
-  if (m_token.value_size() == sizeof(uint64_t))
-    return *reinterpret_cast<const uint64_t*>(m_token.value());
-  else {
-    return readNonNegativeInteger(m_token);
+  if (m_token.value_size() == 0) {
+      const_cast<Bead*>(this)->setToken("");
   }
+  return readString(m_token);
+  // if (m_token.value_size() > 0)
+  //   return *reinterpret_cast<std::string>(m_token.value());
+  // else {
+  //   return readString(m_token);
+  // }
 }
 
 Bead&
-Bead::setToken(uint64_t token)
+Bead::setToken(std::string token)
 {
-  if (m_wire.hasWire() && m_token.value_size() == sizeof(uint64_t)) {
-    std::memcpy(const_cast<uint8_t*>(m_token.value()), &token, sizeof(token));
-  }
-  else {
-    m_token = makeBinaryBlock(tlv::Token,
-                              reinterpret_cast<const uint8_t*>(&token),
-                              sizeof(token));
-    m_wire.reset();
-  }
+  m_token = makeStringBlock(tlv::Token, token);
+  m_wire.reset();
   return *this;
+
+  // if (m_wire.hasWire() && m_token.value_size() > 0) {
+  //   std::memcpy(const_cast<uint8_t*>(m_token.value()), &(token.c_str()), strlen(token.c_str()));
+  // }
+  // else {
+  //   m_token = makeBinaryBlock(tlv::Token,
+  //                             reinterpret_cast<const uint8_t*>(&(token.c_str())),
+  //                             strlen(token.c_str()));
+  //   m_wire.reset();
+  // }
+  // return *this;
 }
 
 

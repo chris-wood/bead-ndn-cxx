@@ -99,9 +99,9 @@ public:
     sendBead(const Bead& bead)
     {
       NS_LOG_DEBUG("<< Bead " << bead.getName());
-      shared_ptr<const Bead> beadPtr = bead.shared_from_this();
+    //   shared_ptr<const Bead> beadPtr = bead.shared_from_this();
     //   m_appFaceImpl.m_scheduler.scheduleEvent(time::seconds(0), [this, beadPtr] {
-    //       m_appFaceImpl.satisfyPendingInterests(*beadPtr);
+    //       m_appFaceImpl.satisfyPendingInterests(*dataPtr);
     //     });
     }
 

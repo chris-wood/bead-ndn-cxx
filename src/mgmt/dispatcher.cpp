@@ -160,7 +160,7 @@ Dispatcher::sendData(const Name& dataName, const Block& content,
   m_keyChain.sign(*data, m_signingInfo);
 
   try {
-    m_face.put(*data);
+    m_face.putData(*data);
   }
   catch (Face::Error& e) {
 #ifdef NDN_CXX_MGMT_DISPATCHER_ENABLE_LOGGING

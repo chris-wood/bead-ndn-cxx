@@ -65,7 +65,7 @@ enum {
   NameComponent = 8,
   Selectors     = 9,
   Nonce         = 10,
-  Token         = 11,
+  //Token         = 11,
   // <Unassigned> = 11,
   InterestLifetime          = 12,
   MinSuffixComponents       = 13,
@@ -90,6 +90,7 @@ enum {
   SelectedDelegation = 32,
   BeadLifetime = 33,
   Bead = 34,
+  Token = 35,
 
   AppPrivateBlock1 = 128,
   AppPrivateBlock2 = 32767

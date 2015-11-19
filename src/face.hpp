@@ -28,6 +28,7 @@
 #include "interest.hpp"
 #include "interest-filter.hpp"
 #include "data.hpp"
+#include "bead.hpp"
 #include "security/signing-info.hpp"
 
 #define NDN_FACE_KEEP_DEPRECATED_REGISTRATION_SIGNING
@@ -520,7 +521,10 @@ public: // producer
    * @throws Error when Data size exceeds maximum limit (MAX_NDN_PACKET_SIZE)
    */
   void
-  put(const Data& data);
+  putData(const Data& data);
+
+  void
+  putBead(const Bead& bead);
 
 public: // IO routine
   /**

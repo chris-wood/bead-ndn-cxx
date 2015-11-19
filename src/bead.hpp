@@ -226,11 +226,11 @@ public: // Name and guiders
     return *this;
   }
 
-  uint64_t
+  std::string
   getToken() const;
 
   Bead&
-  setToken(uint64_t token);
+  setToken(std::string token);
 
   const time::milliseconds&
   getBeadLifetime() const
