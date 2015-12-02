@@ -91,6 +91,7 @@ enum {
   BeadLifetime = 33,
   Bead = 34,
   Token = 35,
+  BeadHops = 36,
 
   AppPrivateBlock1 = 128,
   AppPrivateBlock2 = 32767

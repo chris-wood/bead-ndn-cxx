@@ -81,8 +81,17 @@ public: // getters & setters
     return m_nInInterests;
   }
 
+  uint64_t
+  getNInBeads() const
+  {
+    return m_nInBeads;
+  }
+
   FaceStatus&
   setNInInterests(uint64_t nInInterests);
+
+  FaceStatus&
+  setNInBeads(uint64_t nInBeads);
 
   uint64_t
   getNInDatas() const
@@ -101,6 +110,15 @@ public: // getters & setters
 
   FaceStatus&
   setNOutInterests(uint64_t nOutInterests);
+
+  uint64_t
+  getNOutBeads() const
+  {
+    return m_nOutBeads;
+  }
+
+  FaceStatus&
+  setNOutBeads(uint64_t nOutBeads);
 
   uint64_t
   getNOutDatas() const
@@ -137,9 +155,11 @@ private:
   time::milliseconds m_expirationPeriod;
   bool m_hasExpirationPeriod;
   uint64_t m_nInInterests;
+  uint64_t m_nInBeads;
   uint64_t m_nInDatas;
   uint64_t m_nOutInterests;
   uint64_t m_nOutDatas;
+  uint64_t m_nOutBeads;
   uint64_t m_nInBytes;
   uint64_t m_nOutBytes;
 

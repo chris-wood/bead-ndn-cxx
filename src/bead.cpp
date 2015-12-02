@@ -37,6 +37,7 @@ Bead::Bead()
   : m_BeadLifetime(time::milliseconds::min())
   , m_selectedDelegationIndex(INVALID_SELECTED_DELEGATION_INDEX)
 {
+    setHops(0);
 }
 
 Bead::Bead(const Name& name)
@@ -44,6 +45,7 @@ Bead::Bead(const Name& name)
   , m_BeadLifetime(time::milliseconds::min())
   , m_selectedDelegationIndex(INVALID_SELECTED_DELEGATION_INDEX)
 {
+    setHops(0);
 }
 
 Bead::Bead(const Name& name, const time::milliseconds& BeadLifetime)
@@ -51,6 +53,7 @@ Bead::Bead(const Name& name, const time::milliseconds& BeadLifetime)
   , m_BeadLifetime(BeadLifetime)
   , m_selectedDelegationIndex(INVALID_SELECTED_DELEGATION_INDEX)
 {
+    setHops(0);
 }
 
 Bead::Bead(const Block& wire)
@@ -87,33 +90,6 @@ Bead::setNonce(uint32_t nonce)
   return *this;
 }
 
-// CAW: deletion token added
-
-// uint64_t
-// Bead::getToken() const
-// {
-//   if (m_token.value_size() == sizeof(uint64_t))
-//     return *reinterpret_cast<const uint64_t*>(m_token.value());
-//   else {
-//     return readNonNegativeInteger(m_token);
-//   }
-// }
-//
-// Bead&
-// Bead::setToken(uint64_t token)
-// {
-//   if (m_wire.hasWire() && m_token.value_size() == sizeof(uint64_t)) {
-//     std::memcpy(const_cast<uint8_t*>(m_token.value()), &token, sizeof(token));
-//   }
-//   else {
-//     m_token = makeBinaryBlock(tlv::Token,
-//                               reinterpret_cast<const uint8_t*>(&token),
-//                               sizeof(token));
-//     m_wire.reset();
-//   }
-//   return *this;
-// }
-
 std::string
 Bead::getToken() const
 {
@@ -121,11 +97,6 @@ Bead::getToken() const
       const_cast<Bead*>(this)->setToken("");
   }
   return readString(m_token);
-  // if (m_token.value_size() > 0)
-  //   return *reinterpret_cast<std::string>(m_token.value());
-  // else {
-  //   return readString(m_token);
-  // }
 }
 
 Bead&
@@ -134,17 +105,23 @@ Bead::setToken(std::string token)
   m_token = makeStringBlock(tlv::Token, token);
   m_wire.reset();
   return *this;
+}
 
-  // if (m_wire.hasWire() && m_token.value_size() > 0) {
-  //   std::memcpy(const_cast<uint8_t*>(m_token.value()), &(token.c_str()), strlen(token.c_str()));
-  // }
-  // else {
-  //   m_token = makeBinaryBlock(tlv::Token,
-  //                             reinterpret_cast<const uint8_t*>(&(token.c_str())),
-  //                             strlen(token.c_str()));
-  //   m_wire.reset();
-  // }
-  // return *this;
+uint64_t
+Bead::getHops() const
+{
+  if (m_hops.value_size() == 0) {
+      const_cast<Bead*>(this)->setToken(0);
+  }
+  return readNonNegativeInteger(m_hops);
+}
+
+Bead&
+Bead::setHops(uint64_t hops)
+{
+  m_hops = makeNonNegativeIntegerBlock(tlv::BeadHops, hops);
+  m_wire.reset();
+  return *this;
 }
 
 
@@ -317,6 +294,9 @@ Bead::wireEncode(EncodingImpl<TAG>& encoder) const
   // Deletion token
   totalLength += encoder.prependBlock(m_token);
 
+  // Hop count
+  totalLength += encoder.prependBlock(m_hops);
+
   // Selectors
   if (hasSelectors())
     {
@@ -383,6 +363,9 @@ Bead::wireDecode(const Block& wire)
     }
   else
     m_selectors = Selectors();
+
+  // Hop count
+  m_hops = m_wire.get(tlv::BeadHops);
 
   // Deletion token
   m_token = m_wire.get(tlv::Token);

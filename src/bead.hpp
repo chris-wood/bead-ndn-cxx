@@ -232,6 +232,12 @@ public: // Name and guiders
   Bead&
   setToken(std::string token);
 
+  uint64_t
+  getHops() const;
+
+  Bead&
+  setHops(uint64_t hops);
+
   const time::milliseconds&
   getBeadLifetime() const
   {
@@ -446,6 +452,7 @@ private:
   Selectors m_selectors;
   mutable Block m_nonce;
   mutable Block m_token;
+  mutable Block m_hops;
   time::milliseconds m_BeadLifetime;
 
   mutable Block m_link;
